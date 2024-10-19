@@ -15,8 +15,8 @@ class SDNQLTRFederatedController(OSKenApp):
         self.q_values = {}  # Local Q-values for each switch
         self.global_q_values = {}  # Global Q-values (aggregated)
         self.trust_values = {}  # Trust values for nodes
-        self.learning_rate = 0.5
-        self.discount_factor = 0.9
+        self.learning_rate = 0.6
+        self.discount_factor = 0.95
         self.aggregation_interval = 10  # Time interval for global aggregation
         print("SDNQLTRFederatedController initialized")
 
