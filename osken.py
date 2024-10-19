@@ -102,7 +102,7 @@ class SDNQLTRController(OSKenApp):
 
     # def get_link_quality(self, src, dst):
     #     return random.uniform(0, 100)  # Simulating link quality as a random value between 0 and 100
-    import random
+  
 
 def get_link_quality(self, src, dst):
     """
