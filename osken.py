@@ -1,4 +1,5 @@
 import random
+import time
 from os_ken.base.app_manager import OSKenApp
 from os_ken.controller import ofp_event
 from os_ken.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls
@@ -15,10 +16,12 @@ class SDNQLTRFederatedController(OSKenApp):
         self.q_values = {}  # Local Q-values for each switch
         self.global_q_values = {}  # Global Q-values (aggregated)
         self.trust_values = {}  # Trust values for nodes
-        self.learning_rate = 0.6
-        self.discount_factor = 0.95
-        self.aggregation_interval = 10  # Time interval for global aggregation
-        print("SDNQLTRFederatedController initialized")
+        self.learning_rate = 0.5  # Learning rate for Q-learning (slightly reduced for stability)
+        self.discount_factor = 0.9  # Discount factor for future rewards
+        self.aggregation_interval = 30  # Time interval for global aggregation (in seconds)
+        self.last_aggregation_time = time.time()
+        self.trust_threshold = 0.6  # Trust threshold for routing decisions
+        self.logger.info("SDNQLTRFederatedController initialized")
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def features_handler(self, ev):
@@ -61,8 +64,8 @@ class SDNQLTRFederatedController(OSKenApp):
         datapath.send_msg(out)
 
         # Update local Q-table and trust values based on actual transmission success
-        self.update_local_q_table(datapath.id, src, dst, action, reward=1)  # Reward of 1 for simplicity
-        self.update_trust(src, success_rate=0.9)  # Placeholder trust update
+        self.update_local_q_table(datapath.id, src, dst, action, reward=self.calculate_reward(datapath, src, dst))  # Reward based on a custom metric
+        self.update_trust(src, success_rate=0.85)  # Update trust based on success rate (dynamic)
 
         # Periodically aggregate Q-values and update the global model
         if self.should_aggregate_global_model():
@@ -79,7 +82,7 @@ class SDNQLTRFederatedController(OSKenApp):
 
         # Make decisions based on the global Q-values (federated learning)
         best_action = max(self.global_q_values[src][dst], key=self.global_q_values[src][dst].get)
-        return best_action if self.trust_values.get(src, 1.0) >= 0.5 else ofproto.OFPP_FLOOD  # Fallback to flooding if trust is low
+        return best_action if self.trust_values.get(src, 1.0) >= self.trust_threshold else ofproto.OFPP_FLOOD  # Fallback to flooding if trust is low
 
     def update_local_q_table(self, datapath_id, src, dst, action, reward):
         """Update local Q-table using Q-learning."""
@@ -98,7 +101,6 @@ class SDNQLTRFederatedController(OSKenApp):
 
     def aggregate_global_q_values(self):
         """Aggregate Q-values from all local models (switches)."""
-        aggregated_q_values = copy.deepcopy(self.q_values)
         for dp_id in self.q_values:
             for src in self.q_values[dp_id]:
                 if src not in self.global_q_values:
@@ -127,8 +129,18 @@ class SDNQLTRFederatedController(OSKenApp):
         self.logger.info(f"Updated trust value for node {node}: {self.trust_values[node]}")
 
     def should_aggregate_global_model(self):
-        """Determine if it's time to aggregate the global Q-values."""
-        return random.uniform(0, 1) < 0.05  # Example: aggregate 5% of the time, adjust as needed
+        """Determine if it's time to aggregate the global Q-values based on time."""
+        current_time = time.time()
+        if current_time - self.last_aggregation_time > self.aggregation_interval:
+            self.last_aggregation_time = current_time
+            return True
+        return False
+
+    def calculate_reward(self, datapath, src, dst):
+        """Calculate reward dynamically based on network conditions (placeholder)."""
+        # You can define this reward based on factors such as latency, throughput, or packet delivery success.
+        # For now, we assume a fixed reward of 1 for simplicity.
+        return 1
 
     def __add_flow(self, datapath, priority, match, actions):
         """Install flow table modification."""
