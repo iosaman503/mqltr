@@ -14,8 +14,8 @@ class SDNQLTRController(OSKenApp):
         super(SDNQLTRController, self).__init__(*args, **kwargs)
         self.q_values = {}  # Store Q-values for routing
         self.trust_values = {}  # Trust values for nodes
-        self.learning_rate = 0.5
-        self.discount_factor = 0.9
+        self.learning_rate = 0.45
+        self.discount_factor = 0.85
         print("SDNQLTRController initialized")
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -100,12 +100,34 @@ class SDNQLTRController(OSKenApp):
         self.trust_values[node] = 0.8 * self.trust_values.get(node, 1.0) + 0.2 * quality_factor
         self.logger.info(f"Updated trust for node {node} based on link quality {link_quality}: {self.trust_values[node]}")
 
-    def get_link_quality(self, src, dst):
-        """
-        Placeholder function to simulate link quality. 
-        In a real implementation, this would return a metric like SNR or RSSI.
-        """
-        return random.uniform(0, 100)  # Simulating link quality as a random value between 0 and 100
+    # def get_link_quality(self, src, dst):
+    #     return random.uniform(0, 100)  # Simulating link quality as a random value between 0 and 100
+    import random
+
+def get_link_quality(self, src, dst):
+    """
+    Simulates link quality based on the SNR in underwater communication.
+    The SNR is affected by distance and environmental conditions.
+    """
+    
+    # Assume some parameters for SNR
+    base_snr = 20  # Base SNR in dB at 1m distance
+    snr_decay_per_meter = 0.5  # dB loss per meter of distance
+    max_distance = 100  # Maximum distance for communication
+
+    # Function to calculate distance between nodes (you can implement this as needed)
+    distance = self.get_distance(src, dst)  # Example function to get distance
+
+    if distance > max_distance:
+        return 0  # Quality is zero if distance exceeds max range
+
+    # Calculate SNR based on distance
+    snr = base_snr - (snr_decay_per_meter * distance)
+
+    # Convert SNR to a quality metric (0-100 scale)
+    quality = max(0, min((snr + 40), 100))  # Assuming SNR of 0 dB corresponds to quality 0
+    return quality
+
 
     def __add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
