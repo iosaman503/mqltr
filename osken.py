@@ -14,8 +14,8 @@ class SDNQLTRController(OSKenApp):
         super(SDNQLTRController, self).__init__(*args, **kwargs)
         self.q_values = {}  # Store Q-values for routing
         self.trust_values = {}  # Trust values for nodes
-        self.learning_rate = 0.45
-        self.discount_factor = 0.85
+        self.learning_rate = 0.5
+        self.discount_factor = 0.9
         print("SDNQLTRController initialized")
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -77,7 +77,7 @@ class SDNQLTRController(OSKenApp):
         best_action = max(self.q_values[src][dst], key=self.q_values[src][dst].get)
 
         # Consider trust and link quality together in making the decision
-        if self.trust_values.get(src, 1.0) >= 0.5 and self.get_link_quality(src, dst) > 0.7:  # Assuming 70% is good link quality
+        if self.trust_values.get(src, 1.0) >= 0.5 and self.get_link_quality(src, dst) > 70:  # Assuming 70 is good link quality
             return best_action
         else:
             return ofproto.OFPP_FLOOD  # Use flood if trust is low or link quality is poor
@@ -100,34 +100,37 @@ class SDNQLTRController(OSKenApp):
         self.trust_values[node] = 0.8 * self.trust_values.get(node, 1.0) + 0.2 * quality_factor
         self.logger.info(f"Updated trust for node {node} based on link quality {link_quality}: {self.trust_values[node]}")
 
-    # def get_link_quality(self, src, dst):
-    #     return random.uniform(0, 100)  # Simulating link quality as a random value between 0 and 100
-  
+    def get_link_quality(self, src, dst):
+        """
+        Simulates link quality based on the SNR in underwater communication.
+        The SNR is affected by distance and environmental conditions.
+        """
+        
+        # Assume some parameters for SNR
+        base_snr = 20  # Base SNR in dB at 1m distance
+        snr_decay_per_meter = 0.5  # dB loss per meter of distance
+        max_distance = 100  # Maximum distance for communication
 
-def get_link_quality(self, src, dst):
-    """
-    Simulates link quality based on the SNR in underwater communication.
-    The SNR is affected by distance and environmental conditions.
-    """
-    
-    # Assume some parameters for SNR
-    base_snr = 20  # Base SNR in dB at 1m distance
-    snr_decay_per_meter = 0.5  # dB loss per meter of distance
-    max_distance = 100  # Maximum distance for communication
+        # Calculate distance between nodes (you can implement this as needed)
+        distance = self.get_distance(src, dst)  # Example function to get distance
 
-    # Function to calculate distance between nodes (you can implement this as needed)
-    distance = self.get_distance(src, dst)  # Example function to get distance
+        if distance > max_distance:
+            return 0  # Quality is zero if distance exceeds max range
 
-    if distance > max_distance:
-        return 0  # Quality is zero if distance exceeds max range
+        # Calculate SNR based on distance
+        snr = base_snr - (snr_decay_per_meter * distance)
 
-    # Calculate SNR based on distance
-    snr = base_snr - (snr_decay_per_meter * distance)
+        # Convert SNR to a quality metric (0-100 scale)
+        quality = max(0, min((snr + 40), 100))  # Assuming SNR of 0 dB corresponds to quality 0
+        return quality
 
-    # Convert SNR to a quality metric (0-100 scale)
-    quality = max(0, min((snr + 40), 100))  # Assuming SNR of 0 dB corresponds to quality 0
-    return quality
-
+    def get_distance(self, src, dst):
+        """
+        Placeholder function to calculate distance between nodes.
+        Replace this with your actual distance calculation logic.
+        """
+        # Example: Return a fixed distance (this should be replaced with actual distance computation)
+        return random.uniform(1, 100)  # Simulating a distance between 1 and 100 meters
 
     def __add_flow(self, datapath, priority, match, actions):
         ofproto = datapath.ofproto
